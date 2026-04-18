@@ -574,6 +574,7 @@ textarea.improve-input::placeholder{color:var(--text3)}
 </style>
 </head>
 <body>
+
 <div class="app">
 
 <!-- ── Sidebar ── -->
@@ -2668,9 +2669,6 @@ textarea.improve-input::placeholder{color:var(--text3)}
 </div>
 
 <style>
-/* Start Here specific — fill remaining main height (below ticker) */
-#page-starthere.active { flex: 1 1 auto; height: auto; min-height: 0 }
-
 /* Compact no-scroll wizard styles */
 .sh-step { background:var(--surface); border:1.5px solid var(--border); border-radius:10px; padding:16px 18px 14px; position:relative; display:flex; flex-direction:column; gap:10px; transition:opacity .3s ease, border-color .3s ease, box-shadow .3s ease; min-height:0 }
 .sh-step.sh-locked { opacity:.55; pointer-events:none; filter: grayscale(.3) }
@@ -2764,6 +2762,17 @@ async function init(){
     try{applySettingsPermissions(me);}catch(e3){console.warn('applySettingsPermissions err:',e3);}
   }catch(e){
     console.error('Init failed:',e);
+    // If running without a backend (e.g. GitHub Pages static deploy), don't redirect.
+    // Stay on the page and let the user use client-side features.
+    if(location.hostname.endsWith('github.io') || location.protocol === 'file:' || !location.pathname || location.pathname === '/'){
+      console.warn('Running in static/no-backend mode — skipping redirect');
+      // Set minimal defaults so the UI doesn't break
+      try{
+        document.getElementById('userEmail').textContent='demo@static';
+        document.getElementById('userAv').textContent='D';
+      }catch(_){}
+      return;
+    }
     window.location.href='/';
   }
 }
@@ -4322,7 +4331,13 @@ async function api(method,url,body){
   let r;
   try{ r=await fetch(url,opts); }
   catch(netErr){ throw new Error('Network error — check your connection'); }
-  if(r.status===401){window.location.href='/';return;}
+  if(r.status===401){
+    // On static/GitHub Pages deploys, don't redirect — just throw
+    if(location.hostname.endsWith('github.io') || location.protocol === 'file:'){
+      throw new Error('Backend not available in static mode');
+    }
+    window.location.href='/';return;
+  }
   const d=await r.json();if(d.error)throw new Error(d.error);return d;
 }
 function showOverlay(t,s=''){document.getElementById('ov-title').textContent=t;document.getElementById('ov-sub').textContent=s||'Please wait...';document.getElementById('ov-steps').innerHTML='';document.getElementById('overlay').classList.add('show');}
@@ -4391,7 +4406,13 @@ async function runEstimate(){
 
   try {
     const resp = await fetch('/api/estimate-effort', { method:'POST', body: fd });
-    if(resp.status === 401){ window.location.href='/'; return; }
+    if(resp.status === 401){
+      if(location.hostname.endsWith('github.io') || location.protocol === 'file:'){
+        toast('Backend not available in static mode','error');
+        return;
+      }
+      window.location.href='/'; return;
+    }
     if(resp.status === 400){
       const e = await resp.json();
       toast(e.error || 'Configuration error','error');
